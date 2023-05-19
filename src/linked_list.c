@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 
 linkedlist_t *create_linked_list()
 {
@@ -27,56 +28,73 @@ node_t *create_node(node_t *next, void *data, size_t size)
     // Allocate memory for the node
     if (NULL == (node = malloc(NODE_SIZE)))
     {
-        fprintf(stderr, "Node was not allocated properly. Error: %s\n", strerror(errno));
-        goto node_return;
+        ERRORPRINT("Node was not allocated properly. Error: %s\n", strerror(errno));
+        goto end;
     }
     // Allocate memory for the node's data
     if (NULL == (node->data = malloc(size)))
     {
-        fprintf(stderr, "Node data was not allocated properly. Error: %s\n", strerror(errno));
-        goto node_return;
+        ERRORPRINT("Node data was not allocated properly. Error: %s\n", strerror(errno));
+        goto end;
     }
 
     memcpy(node->data, data, size); // Copy data to the node
 
     node->next = next; // Set the node the newly created node will point to
 
-node_return:
+end:
     return node;
 }
 
 node_t *get_node(linkedlist_t *list, int index)
 {
+    node_t *current = NULL;
     // Check if a proper index exists to get the node
     if (index < 0 || index >= list->length) 
     {
-        fprintf(stderr, "A proper index was not given to get the node");
-        return NULL;
+        ERRORPRINT("Invalid arguments passed to get_node()\n");
+        goto end;
     }
     
-    node_t *current = list->head; // Set the current node to the head of the list
+    current = list->head; // Set the current node to the head of the list
     
     // Loop through linked list to find node at given index
-    for (size_t i = 1; i <= index && current!= NULL; i++)
+    for (size_t i = 1; i <= index && current != NULL; i++)
     {
         current = current->next;
     }
 
+end:
     return current;
 }
 
-void add_end(linkedlist_t *list, void *data, size_t size)
+bool add_end(linkedlist_t *list, void *data, size_t size)
 {
-    /if (NULL == list || NULL == data)
+    bool retval = false;
+    node_t *node = NULL;
+    node_t *prev = NULL;
+
+    if (NULL == list || NULL == data)
     {
-        fprintf(stderr, "Invalid parameters given to add_end()");
-        return;
+        ERRORPRINT("Invalid arguments passed to add_end()\n");
+        goto end;
     }
-    node_t *node = create_node(list->head, data, size); 
+    
+    node = create_node(list->head, data, size);
+    if (NULL == node)
+    {
+        ERRORPRINT("failed to create node when adding to end of linked list\n");
+        goto end;
+    }
 
     if (list->length)
     {
-        node_t *prev = get_node(list, list->length - 1);
+        prev = get_node(list, list->length - 1);
+        if (NULL == prev)
+        {
+            ERRORPRINT("Failed to get node\n");
+            goto end;
+        }
         prev->next = node;
     }
     else
@@ -86,13 +104,15 @@ void add_end(linkedlist_t *list, void *data, size_t size)
     }
 
     list->length++;
+end:
+    return retval;
 }
 
-void add_front(linkedlist_t *list,void *data, size_t size)
+bool add_front(linkedlist_t *list,void *data, size_t size)
 {
     if (NULL == list || NULL == data)
     {
-        fprintf(stderr, "Invalid parameters given to add_front()");
+        ERRORPRINT("Invalid arguments passed to add_front()\n");
         return;
     }
     node_t **head = &list->head;
