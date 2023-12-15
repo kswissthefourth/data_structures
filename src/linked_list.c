@@ -1,3 +1,4 @@
+#include <Windows.h>
 #include "../include/debug.h"
 #include "../include/linked_list.h"
 #include <errno.h>
@@ -6,127 +7,143 @@
 #include <string.h>
 #include <stdbool.h>
 
-linkedlist_t *create_linked_list()
+PLINKED_LIST CreateLinkedList()
 {
-    linkedlist_t *list = NULL;
-    if (NULL == (list = malloc(LIST_SIZE)))
+    PLINKED_LIST plList = NULL;
+
+    plList = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, LIST_SIZE);
+    if (NULL == plList)
     {
         ERRORPRINT("List was not allocated properly. Error: %s\n", strerror(errno));
-        goto list_return;
+        return plList;
     }
-    list->length = 0; 
-    list->head = NULL;
+    plList->dwLength = 0; 
+    plList->pnHead = NULL;
 
-list_return:
-    return list;
+    return plList;
 }
 
-node_t *create_node(node_t *next, void *data, size_t size)
+PNODE CreateNode(PNODE pnNext, PVOID pvData, SIZE_T stSize)
 {
-    node_t *node = NULL;
+    PNODE pnNode = NULL;
 
-    // Allocate memory for the node
-    if (NULL == (node = malloc(NODE_SIZE)))
+    pnNode = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, NODE_SIZE);
+    if (NULL == pnNode)
     {
         ERRORPRINT("Node was not allocated properly. Error: %s\n", strerror(errno));
-        goto end;
+        return pnNode;
     }
-    // Allocate memory for the node's data
-    if (NULL == (node->data = malloc(size)))
+    
+    pnNode->pvData = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, stSize);
+    if (NULL == pnNode->pvData)
     {
         ERRORPRINT("Node data was not allocated properly. Error: %s\n", strerror(errno));
         goto end;
     }
 
-    memcpy(node->data, data, size); // Copy data to the node
+    memcpy(pnNode->pvData, pvData, stSize); // Copy data to the node
 
-    node->next = next; // Set the node the newly created node will point to
+    pnNode->pnNext = pnNext; // Set the node the newly created node will point to
 
 end:
-    return node;
+    return pnNode;
 }
 
-node_t *get_node(linkedlist_t *list, int index)
+PNODE GetNode(PLINKED_LIST plList, DWORD dwIndex);
 {
-    node_t *current = NULL;
+    PNODE pnCurrent = NULL;
+
     // Check if a proper index exists to get the node
-    if (index < 0 || index >= list->length) 
+    if (dwIndex < 0 || dwIndex >= plList->dwLength || NULL == plList)
     {
-        ERRORPRINT("Invalid arguments passed to get_node()\n");
+        ERRORPRINT("Invalid arguments passed to GetNode()\n");
         goto end;
     }
     
-    current = list->head; // Set the current node to the head of the list
+    pnCurrent = plList->pnHead; // Set the current node to the head of the list
     
     // Loop through linked list to find node at given index
-    for (size_t i = 1; i <= index && current != NULL; i++)
+    for (DWORD i = 1; i <= dwIndex && pnCurrent != NULL; i++)
     {
-        current = current->next;
+        pnCurrent = pnCurrent->pnNext;
     }
 
 end:
-    return current;
+    return pnCurrent;
 }
 
-bool add_end(linkedlist_t *list, void *data, size_t size)
+bool add_end(PLINKED_LIST plList, PVOID pvData, SIZE_T stSize)
 {
-    bool retval = false;
-    node_t *node = NULL;
-    node_t *prev = NULL;
+    BOOL  bRetVal = FALSE;
+    PNODE pnNode = NULL;
+    PNODE pnPrev = NULL;
 
-    if (NULL == list || NULL == data)
+    if (NULL == plList || NULL == pvData)
     {
-        ERRORPRINT("Invalid arguments passed to add_end()\n");
+        ERRORPRINT("Invalid arguments passed to AddEnd()\n");
         goto end;
     }
     
-    node = create_node(list->head, data, size);
-    if (NULL == node)
+    pnNode = CreateNode(plList->pnHead, pvData, stSize);
+    if (NULL == pnNode)
     {
-        ERRORPRINT("failed to create node when adding to end of linked list\n");
+        ERRORPRINT("Failed to create node when adding to end of linked list\n");
         goto end;
     }
 
-    if (list->length)
+    if (plList->dwLength)
     {
-        prev = get_node(list, list->length - 1);
-        if (NULL == prev)
+        pnPrev = GetNode(plList, plList->dwLength - 1);
+        if (NULL == pnPrev)
         {
             ERRORPRINT("Failed to get node\n");
             goto end;
         }
-        prev->next = node;
+        pnPrev->pnNext = pnNode;
     }
     else
     {
-        list->head = node;
-        node->next = list->head;
+        plList->pnHead = pnNode;
+        pnNode->pnNext = plList->pnHead;
     }
 
-    list->length++;
+    plList->dwLength++;
+    bRetVal = TRUE;
 end:
-    return retval;
+    return bRetVal;
 }
 
-bool add_front(linkedlist_t *list,void *data, size_t size)
+BOOL AddFront(PLINKED_LIST plList, PVOID pvData, SIZE_T stSize)
 {
-    if (NULL == list || NULL == data)
+    BOOL bRetVal = FALSE;
+    PNODE *ppnHead = NULL;
+    PNODE pnNode = NULL;
+
+    if (NULL == plList || NULL == pvData)
     {
         ERRORPRINT("Invalid arguments passed to add_front()\n");
-        return;
+        return bRetVal;
     }
-    node_t **head = &list->head;
 
-    node_t *node = create_node(*head, data, size);
+    PNODE *ppnHead = &plList->pnHead;
 
-    *head = node;
-
-    if (!list->length)
+    PNODE pnNode = CreateNode(*ppnHead, pvData, stSize);
+    if (NULL == pnNode)
     {
-        node->next = list->head;
+        ERRORPRINT("Failed to create node when adding to front of linked list\n");
+        return bRetVal;
     }
 
-    list->length++;
+    *ppnHead = pnNode;
+
+    if (!plList->dwLength)
+    {
+        pnNode->pnNext = plList->pnHead;
+    }
+
+    plList->dwLength++;
+
+    return bRetVal;
 }
 
 void insert_node(linkedlist_t *list, int index, void *data, size_t size)
