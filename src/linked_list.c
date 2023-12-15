@@ -1,326 +1,402 @@
-#include <Windows.h>
-#include "../include/debug.h"
 #include "../include/linked_list.h"
+#include "../include/debug.h"
+#include <Windows.h>
 #include <errno.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdbool.h>
 
 PLINKED_LIST CreateLinkedList()
 {
-    PLINKED_LIST plList = NULL;
+  PLINKED_LIST plList = NULL;
 
-    plList = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, LIST_SIZE);
-    if (NULL == plList)
-    {
-        ERRORPRINT("List was not allocated properly. Error: %s\n", strerror(errno));
-        return plList;
-    }
-    plList->dwLength = 0; 
-    plList->pnHead = NULL;
-
+  plList = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, LIST_SIZE);
+  if (NULL == plList)
+  {
+    ERRORPRINT("List was not allocated properly. Error: %s\n", strerror(errno));
     return plList;
+  }
+  plList->dwLength = 0;
+  plList->pnHead   = NULL;
+
+  return plList;
 }
 
 PNODE CreateNode(PNODE pnNext, PVOID pvData, SIZE_T stSize)
 {
-    PNODE pnNode = NULL;
+  PNODE pnNode = NULL;
 
-    pnNode = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, NODE_SIZE);
-    if (NULL == pnNode)
-    {
-        ERRORPRINT("Node was not allocated properly. Error: %s\n", strerror(errno));
-        return pnNode;
-    }
-    
-    pnNode->pvData = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, stSize);
-    if (NULL == pnNode->pvData)
-    {
-        ERRORPRINT("Node data was not allocated properly. Error: %s\n", strerror(errno));
-        goto end;
-    }
+  pnNode = (PNODE)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, NODE_SIZE);
+  if (NULL == pnNode)
+  {
+    ERRORPRINT("Failed to allocate memory for node\n");
+    return NULL;
+  }
 
-    memcpy(pnNode->pvData, pvData, stSize); // Copy data to the node
+  pnNode->pvData = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, stSize);
+  if (NULL == pnNode->pvData)
+  {
+    ERRORPRINT("Failed to allocate memory for node data\n");
+    HeapFree(GetProcessHeap(), HEAP_ZERO_MEMORY, pnNode);
+    pnNode = NULL;
+    return NULL;
+  }
 
-    pnNode->pnNext = pnNext; // Set the node the newly created node will point to
+  CopyMemory(pnNode->pvData, pvData, stSize);
 
-end:
-    return pnNode;
+  if (pnNext != NULL)
+  {
+    pnNode->pnNext = pnNext;
+  }
+  else
+  {
+    pnNode->pnNext = NULL;
+  }
+
+  return pnNode;
 }
 
-PNODE GetNode(PLINKED_LIST plList, DWORD dwIndex);
+PNODE GetNode(PLINKED_LIST plList, DWORD dwIndex)
 {
-    PNODE pnCurrent = NULL;
+  PNODE pnCurrent = NULL;
 
-    // Check if a proper index exists to get the node
-    if (dwIndex < 0 || dwIndex >= plList->dwLength || NULL == plList)
-    {
-        ERRORPRINT("Invalid arguments passed to GetNode()\n");
-        goto end;
-    }
-    
-    pnCurrent = plList->pnHead; // Set the current node to the head of the list
-    
-    // Loop through linked list to find node at given index
-    for (DWORD i = 1; i <= dwIndex && pnCurrent != NULL; i++)
-    {
-        pnCurrent = pnCurrent->pnNext;
-    }
+  if (0 > dwIndex || dwIndex >= plList->dwLength || NULL == plList)
+  {
+    ERRORPRINT("Invalid arguments passed to GetNode()\n");
+    return NULL;
+  }
 
-end:
-    return pnCurrent;
+  pnCurrent = plList->pnHead;
+
+  for (DWORD i = 1; i <= dwIndex && pnCurrent != NULL; i++)
+  {
+    pnCurrent = pnCurrent->pnNext;
+  }
+
+  return pnCurrent;
 }
 
-bool add_end(PLINKED_LIST plList, PVOID pvData, SIZE_T stSize)
+BOOL AddEnd(PLINKED_LIST plList, PVOID pvData, SIZE_T stSize)
 {
-    BOOL  bRetVal = FALSE;
-    PNODE pnNode = NULL;
-    PNODE pnPrev = NULL;
+  BOOL  bRetVal = FALSE;
+  PNODE pnNode  = NULL;
+  PNODE pnPrev  = NULL;
 
-    if (NULL == plList || NULL == pvData)
-    {
-        ERRORPRINT("Invalid arguments passed to AddEnd()\n");
-        goto end;
-    }
-    
-    pnNode = CreateNode(plList->pnHead, pvData, stSize);
-    if (NULL == pnNode)
-    {
-        ERRORPRINT("Failed to create node when adding to end of linked list\n");
-        goto end;
-    }
-
-    if (plList->dwLength)
-    {
-        pnPrev = GetNode(plList, plList->dwLength - 1);
-        if (NULL == pnPrev)
-        {
-            ERRORPRINT("Failed to get node\n");
-            goto end;
-        }
-        pnPrev->pnNext = pnNode;
-    }
-    else
-    {
-        plList->pnHead = pnNode;
-        pnNode->pnNext = plList->pnHead;
-    }
-
-    plList->dwLength++;
-    bRetVal = TRUE;
-end:
+  if (NULL == plList || NULL == pvData)
+  {
+    ERRORPRINT("Invalid arguments passed to AddEnd()\n");
     return bRetVal;
+  }
+
+  pnNode = CreateNode(plList->pnHead, pvData, stSize);
+  if (NULL == pnNode)
+  {
+    ERRORPRINT("Failed to create node when adding to end of linked list\n");
+    return bRetVal;
+  }
+
+  if (plList->dwLength)
+  {
+    pnPrev = GetNode(plList, plList->dwLength - 1);
+    if (NULL == pnPrev)
+    {
+      ERRORPRINT("Failed to get node\n");
+      return bRetVal;
+    }
+    pnPrev->pnNext = pnNode;
+  }
+  else
+  {
+    plList->pnHead = pnNode;
+    pnNode->pnNext = NULL;
+  }
+
+  plList->dwLength++;
+  bRetVal = TRUE;
+
+  return bRetVal;
 }
 
 BOOL AddFront(PLINKED_LIST plList, PVOID pvData, SIZE_T stSize)
 {
-    BOOL bRetVal = FALSE;
-    PNODE *ppnHead = NULL;
-    PNODE pnNode = NULL;
+  BOOL  bRetVal = FALSE;
+  PNODE pnNode  = NULL;
 
-    if (NULL == plList || NULL == pvData)
-    {
-        ERRORPRINT("Invalid arguments passed to add_front()\n");
-        return bRetVal;
-    }
-
-    PNODE *ppnHead = &plList->pnHead;
-
-    PNODE pnNode = CreateNode(*ppnHead, pvData, stSize);
-    if (NULL == pnNode)
-    {
-        ERRORPRINT("Failed to create node when adding to front of linked list\n");
-        return bRetVal;
-    }
-
-    *ppnHead = pnNode;
-
-    if (!plList->dwLength)
-    {
-        pnNode->pnNext = plList->pnHead;
-    }
-
-    plList->dwLength++;
-
+  if (NULL == plList || NULL == pvData)
+  {
+    ERRORPRINT("Invalid arguments passed to AddFront()\n");
     return bRetVal;
+  }
+
+  pnNode = CreateNode(plList->pnHead, pvData, stSize);
+  if (NULL == pnNode)
+  {
+    ERRORPRINT("Failed to create node when adding to front of linked list\n");
+    return bRetVal;
+  }
+
+  plList->pnHead = pnNode;
+  plList->dwLength++;
+
+  bRetVal = TRUE;
+  return bRetVal;
 }
 
-void insert_node(linkedlist_t *list, int index, void *data, size_t size)
+BOOL InsertNode(PLINKED_LIST plList, DWORD dwIndex, PVOID pvData, SIZE_T stSize)
 {
-    if (NULL == list || NULL == data)
-    {
-        fprintf(stderr, "Invalid parameters given to add_front()\n");
-        return;
-    }
-    if (index < 0)
-    {
-        fprintf(stderr, "Index of %d is not a valid location for the list\n", index);
-        return;
-    }
-    else if(index == list->length)
-    {
-        add_end(list, data, size);
-    }
-    else if (index > list->length)
-    {
-        add_end(list, data, size);
-        
-    }
-    else if (index == 0)
-    {
-        add_front(list, data, size);
-    }
-    else
-    {
-        node_t *prev = get_node(list, index);
+  BOOL  bRetVal = FALSE;
+  PNODE pnNode  = NULL;
+  PNODE pnPrev  = NULL;
 
-        prev->next = create_node(prev->next, data, size);
+  if (NULL == plList || NULL == pvData)
+  {
+    ERRORPRINT("Invalid arguments passed to InsertNode()\n");
+    return bRetVal;
+  }
 
-        list->length++;
+  if (0 > dwIndex || dwIndex > plList->dwLength)
+  {
+    ERRORPRINT("Invalid location in the linked list\n");
+    return bRetVal;
+  }
+
+  pnNode = CreateNode(NULL, pvData, stSize);
+  if (NULL == pnNode)
+  {
+    ERRORPRINT("Failed to create node when inserting into linked list\n");
+    return bRetVal;
+  }
+
+  if (0 == dwIndex)
+  {
+    // Inserting at the front of the list
+    pnNode->pnNext = plList->pnHead;
+    plList->pnHead = pnNode;
+  }
+  else
+  {
+    pnPrev = GetNode(plList, dwIndex - 1);
+    if (NULL == pnPrev)
+    {
+      ERRORPRINT("Failed to get node\n");
+      return bRetVal;
     }
+    pnNode->pnNext = pnPrev->pnNext;
+    pnPrev->pnNext = pnNode;
+  }
+
+  plList->dwLength++;
+  bRetVal = TRUE;
+
+  return bRetVal;
 }
 
-void remove_node(linkedlist_t *list, void (*fptr)(void *))
+BOOL RemoveNode(PLINKED_LIST plList, VOID (*fptr)(PVOID))
 {
+  BOOL   bRetVal = FALSE;
+  PNODE *ppnHead = NULL;
+  PNODE  pnNext  = NULL;
 
-    if(NULL == list || !list->length) // Check if circularly linked list is empty or not
-    {
-        fprintf(stderr, "List is either empty or null\n");
-        return;
-    }
+  if (NULL == plList || !plList->dwLength)
+  {
+    ERRORPRINT("List is either empty or null\n");
+    return bRetVal;
+  }
 
-    node_t *next = NULL;
-    node_t **head = &list->head;
+  ppnHead = &plList->pnHead;
+  pnNext  = (*ppnHead)->pnNext;
 
-    next = (*head)->next;
-    if ((*head)->data != NULL)
-    {
-        (*fptr)((*head)->data); // Free the data from the head node
-    }
+  if (NULL != (*ppnHead)->pvData)
+  {
+    (*fptr)((*ppnHead)->pvData);
+  }
 
-    free(*head); // Free the head from memory
-    (*head) = next; // Set the next node in the circularly linked list to the head
+  HeapFree(GetProcessHeap(), HEAP_ZERO_MEMORY, *ppnHead);
+  (*ppnHead) = pnNext;
 
-    
-    list->length--; // Decrease the length of the circularly linked list
+  plList->dwLength--;
 
-    // Check if only one item is left in the circularly linked list
-    if (list->length > 0)
-    {
-        node_t *prev = get_node(list, list->length - 1); // get last node
-
-        prev->next = list->head; // Set the last node to point to the head of the list
-    }
+  bRetVal = TRUE;
+  return bRetVal;
 }
 
-void remove_selected(linkedlist_t *list, int index, void (*fptr)(void *))
+BOOL RemoveSelected(PLINKED_LIST plList, DWORD dwIndex, VOID (*fptr)(PVOID))
 {
-    // Check if a valid index was passed
-    if (index < 0 || index >= list->length)
-    {
-        ERRORPRINT("Invalid location in the linked list\n");
-        exit(1);
-    }
+  BOOL  bRetVal   = FALSE;
+  PNODE pnCurrent = NULL;
+  PNODE pnPrev    = NULL;
 
-    // Check if there are any nodes in the list
-    if (list->length == 0)
-    {
-        ERRORPRINT("Linked list currently does not have any nodes\n");
-        exit(1);
-    }
+  // Check if a valid index was passed
+  if (dwIndex >= plList->dwLength)
+  {
+    ERRORPRINT("Invalid location in the linked list\n");
+    return bRetVal;
+  }
 
-    node_t *current = list->head;
-    node_t *tmp = NULL;
+  if (0 == plList->dwLength)
+  {
+    ERRORPRINT("Linked list currently does not have any nodes\n");
+    return bRetVal;
+  }
 
-    for (size_t i = 0; i < index - 1; i++)
-    {
-        current = current->next; // Navigate to the node before the one to be removed
-    }
+  if (0 == dwIndex)
+  {
+    // Removing the head of the list
+    pnCurrent      = plList->pnHead;
+    plList->pnHead = plList->pnHead->pnNext;
+  }
+  else if (dwIndex == plList->dwLength - 1)
+  {
+    // Removing the last node in the list
+    pnPrev         = GetNode(plList, dwIndex - 1);
+    pnCurrent      = pnPrev->pnNext;
+    pnPrev->pnNext = NULL;
+  }
+  else
+  {
+    // Removing a node at a specific position in the list
+    pnPrev         = GetNode(plList, dwIndex - 1);
+    pnCurrent      = pnPrev->pnNext;
+    pnPrev->pnNext = pnCurrent->pnNext;
+  }
 
-    tmp = current->next; // Set tmp to the node that will be removed
-    current->next = tmp->next; // Set current node to point the node that tmp points to
+  if (fptr)
+  {
+    (*fptr)(pnCurrent->pvData);
+  }
 
-    // Check if data exists in node that will be removed
-    if (tmp->data != NULL)
-    {
-        (*fptr)(tmp->data); // Free the data from the node
-    }
+  HeapFree(GetProcessHeap(), HEAP_ZERO_MEMORY, pnCurrent);
+  plList->dwLength--;
 
-    free(tmp); // Remove the node from the circularly linked list
-
-    list->length--; // Decrease the length of the list by 1
+  bRetVal = TRUE;
+  return bRetVal;
 }
 
-void destroy_list(linkedlist_t *list, void (*fptr)(void *))
+BOOL DestroyList(PLINKED_LIST plList, VOID (*fptr)(PVOID))
 {
-    if (list == NULL) // Check if the linked list is empty
-    {
-        return;
-    }
+  BOOL bRetVal = FALSE;
 
-    while(list->length > 0) // loop through the linked list
-    {
-        remove_node(list, fptr);
-    }
+  if (NULL == plList)
+  {
+    ERRORPRINT("Linked list is null\n");
+    return bRetVal;
+  }
 
-    free(list); // Free the linkedlist struct from memory (destroy)
-    
-    DEBUGPRINT("Circularly linked list and its nodes have been destroyed (freed)\n");
+  while (plList->dwLength > 0)
+  {
+    bRetVal = RemoveNode(plList, fptr);
+    if (!bRetVal)
+    {
+      ERRORPRINT("Failed to remove node\n");
+    }
+  }
+
+  if (!HeapFree(GetProcessHeap(), HEAP_ZERO_MEMORY, plList))
+  {
+    ERRORPRINT("Failed to free memory\n");
+    return bRetVal;
+  }
+  plList = NULL;
+
+  bRetVal = TRUE;
+  return bRetVal;
 }
 
-void traversal(linkedlist_t *list, void (*fptr)(void *))
+BOOL TraverseList(PLINKED_LIST plList, VOID (*fptr)(PVOID))
 {
+  BOOL  bRetVal   = FALSE;
+  PNODE pnCurrent = NULL;
 
-    node_t *current = list->head; // Get the head of the circularly linked list
+  if (NULL == plList || NULL == fptr)
+  {
+    ERRORPRINT("Invalid arguments passed to TraverseList()\n");
+    return bRetVal;
+  }
 
-    for (size_t i = 0; i <= list->length; i++)
-    {
-        (*fptr)(current->data); // print void data using specific print function
-        current = current->next; // Move to the next node
-    }
-    printf("\n");
-    DEBUGPRINT("End of circularly linked list traversal\n");
+  pnCurrent = plList->pnHead;
 
+  while (NULL != pnCurrent)
+  {
+    (*fptr)(pnCurrent->pvData);
+    pnCurrent = pnCurrent->pnNext;
+  }
+
+  bRetVal = TRUE;
+  return bRetVal;
 }
 
-void sort(linkedlist_t *list, int (*fptr)(void *, void *))
+BOOL SortList(PLINKED_LIST plList, INT (*fptr)(PVOID, PVOID))
 {
-    node_t *start = list->head;
-    node_t *tmp = start->next;
+  BOOL  bRetVal = FALSE;
+  PNODE pnStart = NULL;
+  PNODE pnTmp   = NULL;
+  PVOID pvTmp   = NULL;
 
-    void *tmpdata = NULL;
+  if (NULL == plList || NULL == fptr)
+  {
+    ERRORPRINT("Invalid arguments passed to SortList()\n");
+    return bRetVal;
+  }
 
-    // Bubble sort
-    for (size_t i = 0; i < list->length; i++)
+  if (0 == plList->dwLength)
+  {
+    ERRORPRINT("Linked list is empty\n");
+    return bRetVal;
+  }
+
+  pnStart = plList->pnHead;
+
+  // Bubble sort
+  for (DWORD i = 0; i < plList->dwLength; i++)
+  {
+    pnTmp = pnStart->pnNext;
+
+    for (DWORD j = 0; j < plList->dwLength - i - 1; j++)
     {
-        for(size_t j = 0; j <= list->length; j++)
-        {
-            if((*fptr)(start->data, tmp->data)) // Compare data
-            {
-                // Swap data
-                tmpdata = start->data;
-                start->data = tmp->data;
-                tmp->data = tmpdata;
-                
-            }
-            tmp = tmp->next;
-        }
-        start = start->next; 
+      if ((*fptr)(pnStart->pvData, pnTmp->pvData)) // Compare data
+      {
+        // Swap data
+        pvTmp           = pnStart->pvData;
+        pnStart->pvData = pnTmp->pvData;
+        pnTmp->pvData   = pvTmp;
+      }
+      pnTmp = pnTmp->pnNext;
     }
+    pnStart = pnStart->pnNext;
+  }
+
+  bRetVal = TRUE;
+  return bRetVal;
 }
 
-void find_data(linkedlist_t *list, int (*fptr)(void *, void *), void *value)
+BOOL FindData(PLINKED_LIST plList, INT (*fptr)(PVOID, PVOID), PVOID pvValue)
 {
-    node_t *current = list->head; // Get the head of the circularly linked list
-    for (size_t i = 0; i <= list->length; i++)
+  BOOL  bRetVal   = FALSE;
+  PNODE pnCurrent = NULL;
+
+  if (NULL == plList || NULL == fptr || NULL == pvValue)
+  {
+    ERRORPRINT("Invalid arguments passed to FindData()\n");
+    return bRetVal;
+  }
+
+  if (0 == plList->dwLength)
+  {
+    ERRORPRINT("Linked list is empty\n");
+    return bRetVal;
+  }
+
+  pnCurrent = plList->pnHead;
+
+  for (DWORD i = 0; i < plList->dwLength; i++)
+  {
+    if ((*fptr)(pnCurrent->pvData, pvValue))
     {
-        if (fptr(current->data,value))
-        {
-            DEBUGPRINT("Found a match\n");
-            return;
-        }
-        current = current->next;
+      DEBUGPRINT("Found a match\n");
+      bRetVal = TRUE;
+      return bRetVal;
     }
-    DEBUGPRINT("Did not find a match\n");
+    pnCurrent = pnCurrent->pnNext;
+  }
+
+  DEBUGPRINT("Did not find a match\n");
+  return bRetVal;
 }
